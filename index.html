@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>LinguaScan · למידת שפות ממסמכים</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&family=Frank+Ruhl+Libre:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --blue:#7B9BC2; --blue-light:#EAF0F8; --blue-dark:#4F6E96;
+  --pink:#D9A0B3; --pink-light:#FBF0F3; --pink-dark:#B87A8E;
+  --brown:#AB8768; --brown-light:#F5EEE4; --brown-dark:#8A6B4E;
+  --cream:#FAF7F3; --paper:#FFFFFF;
+  --line:#EAE3DA;
+  --text:#3D3630; --text-soft:#948A7E;
+  --green:#7FA987; --red:#C77E7E; --amber:#D6A968;
+  --radius:18px; --radius-sm:12px;
+  --shadow:0 2px 16px rgba(80,64,48,0.06);
+  --shadow-sm:0 1px 6px rgba(80,64,48,0.05);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+body{
+  margin:0; min-height:100vh;
+  font-family:'Heebo',sans-serif; color:var(--text);
+  background:var(--cream);
+  min-height:100dvh;
+}
+.serif{font-family:'Frank Ruhl Libre',serif;}
+.ltr{direction:ltr; font-family:'Poppins',sans-serif; unicode-bidi:isolate;}
+#app{max-width:520px; margin:0 auto; padding:20px 18px 44px; min-height:100dvh;}
+.topbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid var(--line);}
+.logo{display:flex; align-items:center; gap:11px;}
+.logo-dot{width:36px; height:36px; border-radius:10px; background:var(--paper); border:1.5px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:16px;}
+.logo-text{font-family:'Frank Ruhl Libre',serif; font-weight:600; font-size:20px; letter-spacing:0.2px;}
+.logo-sub{font-size:11px; color:var(--text-soft); margin-top:1px;}
+.icon-btn{width:36px; height:36px; border-radius:10px; border:1.5px solid var(--line); background:var(--paper); display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:15px; color:var(--text-soft);}
+
+.card{background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:24px; margin-bottom:16px;}
+h1{font-family:'Frank Ruhl Libre',serif; font-size:23px; font-weight:600; margin:0 0 6px; letter-spacing:0.1px;}
+h2{font-family:'Frank Ruhl Libre',serif; font-size:18px; font-weight:600; margin:0 0 10px;}
+p.sub{color:var(--text-soft); font-size:13.5px; line-height:1.7; margin:0 0 18px;}
+
+.steps{display:flex; flex-direction:column; gap:12px; margin-bottom:20px;}
+.step{display:flex; align-items:flex-start; gap:12px;}
+.step-num{width:24px; height:24px; min-width:24px; border-radius:50%; border:1.5px solid var(--blue); color:var(--blue-dark); font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; margin-top:1px;}
+.step-txt{font-size:13.5px; line-height:1.6; color:var(--text);}
+.step-txt b{font-weight:600;}
+
+.dropzone{
+  border:1.5px dashed #CDBFAE; border-radius:var(--radius);
+  background:var(--brown-light); padding:34px 18px; text-align:center;
+  cursor:pointer; transition:.2s; margin-bottom:12px;
+}
+.dropzone.drag{background:var(--blue-light); border-color:var(--blue);}
+.dropzone .icn{font-size:28px; margin-bottom:10px; opacity:.75;}
+.dropzone .txt{font-weight:600; font-size:14.5px;}
+.dropzone .txt2{font-size:12px; color:var(--text-soft); margin-top:5px;}
+.filetypes{display:flex; gap:8px; justify-content:center; margin-top:16px; flex-wrap:wrap;}
+.filetype-chip{background:var(--paper); border:1px solid var(--line); border-radius:999px; padding:6px 13px; font-size:11.5px; color:var(--text-soft);}
+
+.btn{
+  border:none; border-radius:14px; padding:14px 18px; font-family:inherit;
+  font-weight:600; font-size:14.5px; cursor:pointer; width:100%;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  transition:.15s;
+}
+.btn:active{transform:scale(0.98);}
+.btn-primary{background:var(--blue-dark); color:#fff;}
+.btn-pink{background:var(--pink-dark); color:#fff;}
+.btn-brown{background:var(--paper); color:var(--brown-dark); border:1.5px solid var(--brown);}
+.btn-ghost{background:var(--paper); color:var(--text); border:1.5px solid var(--line);}
+.btn-sm{padding:9px 14px; font-size:13px; width:auto;}
+.btn[disabled]{opacity:.45; cursor:not-allowed;}
+
+.game-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+.game-tile{
+  border-radius:16px; padding:18px 15px; cursor:pointer; border:1.5px solid var(--line);
+  background:var(--paper); position:relative; overflow:hidden; min-height:112px;
+  display:flex; flex-direction:column; justify-content:flex-end;
+}
+.game-tile .icon{position:absolute; top:14px; left:14px; font-size:20px; opacity:.55;}
+.game-tile .title{font-family:'Frank Ruhl Libre',serif; font-weight:600; font-size:15.5px; color:var(--text);}
+.game-tile .desc{font-size:11px; opacity:.8; margin-top:2px; color:var(--text-soft);}
+.tile-1{border-top:3px solid var(--blue);}
+.tile-2{border-top:3px solid var(--pink);}
+.tile-3{border-top:3px solid var(--brown);}
+.tile-4{border-top:3px solid var(--green);}
+
+.deck-item{
+  display:flex; align-items:center; justify-content:space-between;
+  background:var(--paper); border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin-bottom:10px;
+  cursor:pointer;
+}
+.deck-item .meta{font-size:12px; color:var(--text-soft); margin-top:2px;}
+.deck-badge{background:var(--blue-light); color:var(--blue-dark); font-size:11px; padding:4px 10px; border-radius:999px; font-weight:600;}
+
+.spinner{width:38px; height:38px; border-radius:50%; border:3px solid var(--blue-light); border-top-color:var(--blue-dark); animation:spin 0.9s linear infinite; margin:20px auto;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.center-txt{text-align:center; color:var(--text-soft); font-size:14px;}
+
+.word-row{display:flex; align-items:center; justify-content:space-between; padding:11px 0; border-bottom:1px solid var(--line);}
+.word-row:last-child{border-bottom:none;}
+.word-main{font-weight:600; font-size:15px;}
+.word-trans{color:var(--text-soft); font-size:13px; margin-top:1px;}
+.chip-len{background:var(--brown-light); color:var(--brown-dark); font-size:11px; padding:3px 9px; border-radius:999px; font-weight:600;}
+
+/* Flashcard */
+.flip-wrap{perspective:1200px; margin-bottom:18px;}
+.flip-card{position:relative; width:100%; height:230px; transition:transform .5s; transform-style:preserve-3d; cursor:pointer;}
+.flip-card.flipped{transform:rotateY(180deg);}
+.flip-face{
+  position:absolute; inset:0; backface-visibility:hidden; border-radius:var(--radius);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px;
+  box-shadow:var(--shadow); text-align:center; border:1px solid var(--line);
+}
+.flip-front{background:var(--blue-light); color:var(--blue-dark);}
+.flip-back{background:var(--pink-light); color:var(--pink-dark); transform:rotateY(180deg);}
+.flip-word{font-family:'Frank Ruhl Libre',serif; font-size:29px; font-weight:600;}
+.flip-pos{font-size:12px; opacity:.8; margin-top:6px;}
+.flip-example{font-size:13px; opacity:.85; margin-top:14px; line-height:1.5;}
+.nav-row{display:flex; gap:10px; margin-top:8px;}
+.progress-txt{text-align:center; color:var(--text-soft); font-size:13px; margin-bottom:10px;}
+
+/* Quiz */
+.quiz-word{font-family:'Frank Ruhl Libre',serif; font-size:27px; font-weight:600; text-align:center; margin:12px 0 24px;}
+.opt-btn{
+  display:block; width:100%; text-align:right; background:var(--paper); border:1.5px solid var(--line);
+  border-radius:12px; padding:14px 16px; margin-bottom:10px; font-family:inherit; font-size:14px;
+  cursor:pointer; font-weight:600;
+}
+.opt-btn.correct{border-color:var(--green); background:#EEF5EF; color:#3C7A4C;}
+.opt-btn.wrong{border-color:var(--red); background:#FBEFEF; color:#A04949;}
+.score-pill{background:var(--blue-light); color:var(--blue-dark); border-radius:999px; padding:5px 14px; font-size:13px; font-weight:700;}
+
+/* Wordle */
+.wl-grid{display:grid; gap:6px; margin-bottom:16px;}
+.wl-row{display:grid; gap:6px;}
+.wl-cell{
+  aspect-ratio:1; border-radius:6px; border:1.5px solid var(--line); background:var(--paper);
+  display:flex; align-items:center; justify-content:center; font-weight:700; font-size:18px;
+  text-transform:uppercase; font-family:'Poppins',sans-serif;
+}
+.wl-cell.g{background:var(--green); border-color:var(--green); color:#fff;}
+.wl-cell.y{background:var(--amber); border-color:var(--amber); color:#fff;}
+.wl-cell.b{background:#C7BEB4; border-color:#C7BEB4; color:#fff;}
+.kb{display:flex; flex-direction:column; gap:6px; margin-top:14px;}
+.kb-row{display:flex; gap:5px; justify-content:center;}
+.kb-key{
+  flex:1; max-width:34px; height:42px; border-radius:7px; border:1px solid var(--line); background:var(--paper);
+  font-family:'Poppins',sans-serif; font-weight:600; font-size:12px;
+  text-transform:uppercase; cursor:pointer; color:var(--text);
+}
+.kb-key.wide{max-width:56px; font-size:11px;}
+.kb-key.g{background:var(--green); border-color:var(--green); color:#fff;}
+.kb-key.y{background:var(--amber); border-color:var(--amber); color:#fff;}
+.kb-key.b{background:#C7BEB4; border-color:#C7BEB4; color:#fff;}
+
+/* Memory */
+.mem-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+.mem-card{
+  aspect-ratio:0.85; border-radius:10px; background:var(--brown-light); border:1.5px solid var(--line);
+  display:flex; align-items:center; justify-content:center; cursor:pointer;
+  font-size:20px; color:var(--brown-dark); text-align:center; padding:6px; font-weight:600;
+}
+.mem-card.open{background:var(--paper); color:var(--text); font-size:12px; border:1.5px solid var(--blue);}
+.mem-card.matched{background:var(--green); border-color:var(--green); color:#fff; opacity:.5;}
+
+.upload-preview{display:flex; align-items:center; gap:10px; background:var(--brown-light); border-radius:12px; padding:10px 14px; margin-bottom:14px;}
+.upload-preview .fname{font-size:13px; font-weight:600; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+input[type=file]{display:none;}
+.err-box{background:#FBEFEF; color:#A04949; border:1px solid #EFD5D5; border-radius:12px; padding:12px 14px; font-size:13px; margin-bottom:14px;}
+.result-box{text-align:center; padding:30px 0;}
+.result-emoji{font-size:40px; margin-bottom:10px; opacity:.85;}
+.result-score{font-family:'Frank Ruhl Libre',serif; font-size:32px; font-weight:600;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ---------------- Global State ----------------
+let state = {
+  screen: 'home',
+  deck: null,
+  savedDecks: [],
+  uploadedFile: null,
+  gameData: {}
+};
+
+const app = document.getElementById('app');
+
+// ---------------- Storage ----------------
+const hasClaudeStorage = typeof window.storage !== 'undefined';
+
+async function loadSavedDecks(){
+  try{
+    if(hasClaudeStorage){
+      const list = await window.storage.list('deck:');
+      if(!list || !list.keys) return [];
+      const decks = [];
+      for(const k of list.keys){
+        try{
+          const r = await window.storage.get(k);
+          if(r) decks.push(JSON.parse(r.value));
+        }catch(e){}
+      }
+      decks.sort((a,b)=> b.createdAt - a.createdAt);
+      return decks;
+    } else {
+      const raw = localStorage.getItem('linguaScanDecks');
+      const decks = raw ? JSON.parse(raw) : [];
+      decks.sort((a,b)=> b.createdAt - a.createdAt);
+      return decks;
+    }
+  }catch(e){ return []; }
+}
+async function saveDeck(deck){
+  try{
+    if(hasClaudeStorage){
+      await window.storage.set('deck:'+deck.id, JSON.stringify(deck));
+    } else {
+      const raw = localStorage.getItem('linguaScanDecks');
+      const decks = raw ? JSON.parse(raw) : [];
+      decks.push(deck);
+      localStorage.setItem('linguaScanDecks', JSON.stringify(decks));
+    }
+  }catch(e){}
+}
+async function deleteDeck(id){
+  try{
+    if(hasClaudeStorage){
+      await window.storage.delete('deck:'+id);
+    } else {
+      const raw = localStorage.getItem('linguaScanDecks');
+      let decks = raw ? JSON.parse(raw) : [];
+      decks = decks.filter(d=>d.id!==id);
+      localStorage.setItem('linguaScanDecks', JSON.stringify(decks));
+    }
+  }catch(e){}
+}
+
+// ---------------- Claude API ----------------
+async function callClaude(content){
+  const apiKey = getApiKey();
+  if(!apiKey){
+    throw new Error('לא הוגדר מפתח API. לחץ על ⚙️ בדף הבית והזן מפתח מ-console.anthropic.com');
+  }
+  let res;
+  try{
+    res = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      body: JSON.stringify({
+        model:"claude-sonnet-4-6",
+        max_tokens:1000,
+        messages:[{role:"user", content}]
+      })
+    });
+  }catch(networkErr){
+    throw new Error('בעיית תקשורת מול השרת (Failed to fetch). בדוק את החיבור לאינטרנט, ושהמפתח בהגדרות תקין.');
+  }
+  if(!res.ok){
+    let msg = 'שגיאת שרת (' + res.status + ')';
+    try{ const errData = await res.json(); if(errData?.error?.message) msg += ': ' + errData.error.message; }catch(e){}
+    if(res.status===401) msg = 'המפתח שהוזן לא תקין. עדכן אותו בהגדרות (⚙️).';
+    throw new Error(msg);
+  }
+  const data = await res.json();
+  const textBlock = (data.content||[]).find(b=>b.type==="text");
+  if(!textBlock) throw new Error("לא התקבלה תשובה תקינה מהשרת");
+  return textBlock.text;
+}
+
+function parseVocabJson(raw){
+  let clean = raw.trim().replace(/^```json/,'').replace(/^```/,'').replace(/```$/,'').trim();
+  const parsed = JSON.parse(clean);
+  if(!parsed.words || !Array.isArray(parsed.words)) throw new Error("bad shape");
+  parsed.words = parsed.words.filter(w=>w.word && w.translation).map(w=>({
+    word: String(w.word).trim(),
+    translation: String(w.translation).trim(),
+    pos: w.pos || '',
+    example: w.example || '',
+    length: String(w.word).trim().length
+  }));
+  return parsed;
+}
+
+const VOCAB_PROMPT = `אתה עוזר ללימוד שפות. תקבל טקסט או מסמך במקור. בצע:
+1. זהה את השפה של הטקסט.
+2. חלץ עד 18 מילים או ביטויים קצרים שהם המילים המרכזיות/השימושיות ביותר בטקסט (הימנע ממילות קישור טריוויאליות).
+3. עבור כל מילה תן: את המילה במקור, תרגום קצר לעברית, חלק דיבר (pos, בעברית קצר כמו "שם עצם"/"פועל"/"שם תואר"), ומשפט דוגמה קצר מתוך הטקסט או שנוצר על ידך המכיל את המילה.
+החזר אך ורק JSON תקני בפורמט הבא, בלי שום טקסט נוסף, בלי מרקדאון:
+{"detectedLanguage":"שם השפה בעברית","words":[{"word":"...","translation":"...","pos":"...","example":"..."}]}`;
+
+async function extractFromText(text){
+  const raw = await callClaude(VOCAB_PROMPT + "\n\nהטקסט:\n" + text.slice(0,6000));
+  return parseVocabJson(raw);
+}
+async function extractFromImage(base64, mediaType){
+  const raw = await callClaude([
+    {type:"image", source:{type:"base64", media_type:mediaType, data:base64}},
+    {type:"text", text: VOCAB_PROMPT}
+  ]);
+  return parseVocabJson(raw);
+}
+async function extractFromPdf(base64){
+  const raw = await callClaude([
+    {type:"document", source:{type:"base64", media_type:"application/pdf", data:base64}},
+    {type:"text", text: VOCAB_PROMPT}
+  ]);
+  return parseVocabJson(raw);
+}
+
+function fileToBase64(file){
+  return new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = ()=> res(r.result.split(',')[1]);
+    r.onerror = ()=> rej(new Error("read failed"));
+    r.readAsDataURL(file);
+  });
+}
+
+// Resize/compress images so large phone photos don't blow up the request
+function compressImage(file, maxDim=1500, quality=0.85){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = ()=>{
+      let {width, height} = img;
+      if(width > maxDim || height > maxDim){
+        if(width > height){ height = Math.round(height * maxDim/width); width = maxDim; }
+        else { width = Math.round(width * maxDim/height); height = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      resolve(dataUrl.split(',')[1]);
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error('לא ניתן לקרוא את התמונה')); };
+    img.src = url;
+  });
+}
+
+async function processFile(file){
+  const ext = file.name.split('.').pop().toLowerCase();
+  if(file.size > 25*1024*1024){
+    throw new Error('הקובץ גדול מדי (מעל 25MB). נסה קובץ קטן יותר.');
+  }
+  if(['png','jpg','jpeg','webp','gif'].includes(ext)){
+    const b64 = await compressImage(file);
+    return await extractFromImage(b64, 'image/jpeg');
+  }
+  if(ext==='pdf'){
+    const b64 = await fileToBase64(file);
+    return await extractFromPdf(b64);
+  }
+  if(ext==='docx'){
+    const buf = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({arrayBuffer: buf});
+    return await extractFromText(result.value);
+  }
+  if(['xlsx','xls','csv'].includes(ext)){
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array'});
+    let text = '';
+    wb.SheetNames.forEach(name=>{
+      const sheet = wb.Sheets[name];
+      text += XLSX.utils.sheet_to_csv(sheet) + '\n';
+    });
+    return await extractFromText(text);
+  }
+  throw new Error('סוג קובץ לא נתמך');
+}
+
+// ---------------- Rendering Router ----------------
+function render(){
+  if(state.screen==='home') return renderHome();
+  if(state.screen==='processing') return renderProcessing();
+  if(state.screen==='error') return renderError();
+  if(state.screen==='deckReview') return renderDeckReview();
+  if(state.screen==='games') return renderGamesHub();
+  if(state.screen==='flashcards') return renderFlashcards();
+  if(state.screen==='quiz') return renderQuiz();
+  if(state.screen==='wordle') return renderWordle();
+  if(state.screen==='memory') return renderMemory();
+}
+
+function topbar(showBack, backFn){
+  return `<div class="topbar">
+    <div class="logo">
+      <div class="logo-dot serif">Lc</div>
+      <div><div class="logo-text">LinguaScan</div><div class="logo-sub">למידת שפות ממסמכים</div></div>
+    </div>
+    <div style="display:flex; gap:8px;">
+      ${!showBack ? `<button class="icon-btn" onclick="openSettings()">⚙</button>` : ''}
+      ${showBack ? `<button class="icon-btn" onclick="${backFn}">✕</button>` : ''}
+    </div>
+  </div>`;
+}
+
+let inMemoryApiKey = '';
+function getApiKey(){
+  if(inMemoryApiKey) return inMemoryApiKey;
+  try{ return localStorage.getItem('linguaScanApiKey') || ''; }catch(e){ return ''; }
+}
+function setApiKey(k){
+  inMemoryApiKey = k;
+  try{ localStorage.setItem('linguaScanApiKey', k); }catch(e){}
+}
+window.openSettings = function(){
+  const current = getApiKey();
+  app.innerHTML = topbar(true, "goHome()") + `
+    <div class="card">
+      <h1>הגדרות</h1>
+      <p class="sub">כדי שהאפליקציה תעבוד באופן עצמאי (מחוץ לצ'אט של קלוד), צריך מפתח API אישי מ-<span class="ltr">console.anthropic.com</span>. המפתח נשמר רק בדפדפן שלך, בקובץ הזה בלבד.</p>
+      <input type="password" id="apiKeyInput" placeholder="sk-ant-..." class="ltr" style="width:100%; padding:14px; border-radius:14px; border:2px solid #eee; font-size:14px; margin-bottom:12px;" value="${current}">
+      <button class="btn btn-primary" onclick="saveApiKey()">שמור מפתח</button>
+    </div>
+  `;
+};
+window.saveApiKey = function(){
+  const val = document.getElementById('apiKeyInput').value.trim();
+  if(!val){ return; }
+  setApiKey(val);
+  const btn = event.target;
+  btn.textContent = '✓ נשמר! חוזר...';
+  setTimeout(goHome, 700);
+};
+
+// ---------------- HOME ----------------
+async function renderHome(){
+  app.innerHTML = topbar(false) + `
+    <div class="card">
+      <h1>העלה מסמך ותתחיל ללמוד</h1>
+      <p class="sub">תמונה, PDF, Word או Excel — נחלץ מהם את אוצר המילים ונבנה עבורך משחקים ללימוד השפה.</p>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-txt">העלה או צלם <b>מסמך</b> בשפה שאתה לומד</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-txt">אנחנו <b>מזהים ומתרגמים</b> את המילים החשובות בו</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-txt">אתה <b>מתרגל</b> אותן בארבעה משחקים שונים</div></div>
+      </div>
+      <div class="dropzone" id="dz">
+        <div class="icn">◇</div>
+        <div class="txt">גרור קובץ לכאן או לחץ לבחירה</div>
+        <div class="txt2">העיבוד מתבצע באמצעות בינה מלאכותית</div>
+      </div>
+      <div style="display:flex; gap:10px; margin-bottom:6px;">
+        <button class="btn btn-brown" id="cameraBtn">צלם עכשיו</button>
+      </div>
+      <input type="file" id="fileInput" accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.docx,.xlsx,.xls,.csv">
+      <input type="file" id="cameraInput" accept="image/*" capture="environment">
+      <div class="filetypes">
+        <span class="filetype-chip">תמונה</span>
+        <span class="filetype-chip">PDF</span>
+        <span class="filetype-chip">Word</span>
+        <span class="filetype-chip">Excel</span>
+      </div>
+    </div>
+    <div id="savedSection"></div>
+  `;
+  document.getElementById('dz').onclick = ()=> document.getElementById('fileInput').click();
+  document.getElementById('fileInput').onchange = (e)=>{
+    if(e.target.files[0]) startProcessing(e.target.files[0]);
+  };
+  document.getElementById('cameraBtn').onclick = ()=> document.getElementById('cameraInput').click();
+  document.getElementById('cameraInput').onchange = (e)=>{
+    if(e.target.files[0]) startProcessing(e.target.files[0]);
+  };
+  const dz = document.getElementById('dz');
+  dz.ondragover = (e)=>{ e.preventDefault(); dz.classList.add('drag'); };
+  dz.ondragleave = ()=> dz.classList.remove('drag');
+  dz.ondrop = (e)=>{
+    e.preventDefault(); dz.classList.remove('drag');
+    if(e.dataTransfer.files[0]) startProcessing(e.dataTransfer.files[0]);
+  };
+
+  state.savedDecks = await loadSavedDecks();
+  const sec = document.getElementById('savedSection');
+  if(state.savedDecks.length){
+    sec.innerHTML = `<div class="card">
+      <h2>חפיסות שמורות</h2>
+      ${state.savedDecks.map(d=>`
+        <div class="deck-item" onclick="openDeck('${d.id}')">
+          <div>
+            <div class="word-main">${d.title}</div>
+            <div class="meta">${d.words.length} מילים · ${d.detectedLanguage||''}</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="deck-badge">פתח</span>
+            <button class="icon-btn" style="width:30px;height:30px;font-size:13px;" onclick="event.stopPropagation(); removeDeck('${d.id}')">מחק</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>`;
+  } else {
+    sec.innerHTML = '';
+  }
+}
+
+window.openDeck = function(id){
+  const deck = state.savedDecks.find(d=>d.id===id);
+  if(!deck) return;
+  state.deck = deck;
+  state.screen = 'deckReview';
+  render();
+};
+window.removeDeck = async function(id){
+  await deleteDeck(id);
+  state.savedDecks = state.savedDecks.filter(d=>d.id!==id);
+  render();
+};
+
+async function startProcessing(file){
+  state.uploadedFile = file;
+  state.screen = 'processing';
+  render();
+  try{
+    const result = await processFile(file);
+    if(!result.words || result.words.length < 4){
+      throw new Error('נמצאו מעט מדי מילים במסמך. נסה קובץ עם יותר טקסט.');
+    }
+    const deck = {
+      id: 'd'+Date.now(),
+      title: file.name.replace(/\.[^.]+$/,''),
+      detectedLanguage: result.detectedLanguage || '',
+      words: result.words,
+      createdAt: Date.now()
+    };
+    state.deck = deck;
+    await saveDeck(deck);
+    state.screen = 'deckReview';
+    render();
+  }catch(err){
+    state.errorMsg = err.message || 'משהו השתבש בעיבוד הקובץ';
+    state.screen = 'error';
+    render();
+  }
+}
+
+function renderProcessing(){
+  app.innerHTML = topbar(false) + `
+    <div class="card" style="text-align:center; padding:50px 20px;">
+      <div class="spinner"></div>
+      <h2>מעבד את המסמך...</h2>
+      <p class="sub">מחלץ אוצר מילים ומתרגם</p>
+    </div>
+  `;
+}
+function renderError(){
+  app.innerHTML = topbar(true, "goHome()") + `
+    <div class="card">
+      <div class="err-box">${state.errorMsg}</div>
+      <button class="btn btn-primary" onclick="goHome()">חזרה לדף הבית</button>
+    </div>
+  `;
+}
+window.goHome = function(){ state.screen='home'; render(); };
+
+// ---------------- DECK REVIEW ----------------
+function renderDeckReview(){
+  const d = state.deck;
+  app.innerHTML = topbar(true, "goHome()") + `
+    <div class="card">
+      <h1>${d.title}</h1>
+      <p class="sub">שפה: ${d.detectedLanguage || 'לא זוהתה'} · ${d.words.length} מילים נמצאו</p>
+      ${d.words.map(w=>`
+        <div class="word-row">
+          <div>
+            <div class="word-main ltr">${w.word}</div>
+            <div class="word-trans">${w.translation}${w.pos? ' · '+w.pos:''}</div>
+          </div>
+          <span class="chip-len">${w.length} אותיות</span>
+        </div>
+      `).join('')}
+    </div>
+    <button class="btn btn-primary" onclick="goGames()">בוא נתחיל ללמוד</button>
+  `;
+}
+window.goGames = function(){ state.screen='games'; render(); };
+
+// ---------------- GAMES HUB ----------------
+function renderGamesHub(){
+  app.innerHTML = topbar(true, "goHome()") + `
+    <div class="card">
+      <h2>${state.deck.title}</h2>
+      <p class="sub">בחר משחק לתרגול</p>
+      <div class="game-grid">
+        <div class="game-tile tile-1" onclick="startFlashcards()">
+          <div class="icon">◆</div>
+          <div class="title">כרטיסיות</div>
+          <div class="desc">הפוך ולמד</div>
+        </div>
+        <div class="game-tile tile-2" onclick="startQuiz()">
+          <div class="icon">✓</div>
+          <div class="title">בחירה מרובה</div>
+          <div class="desc">4 תשובות</div>
+        </div>
+        <div class="game-tile tile-3" onclick="startWordle()">
+          <div class="icon">▦</div>
+          <div class="title">וורדל</div>
+          <div class="desc">נחש את המילה</div>
+        </div>
+        <div class="game-tile tile-4" onclick="startMemory()">
+          <div class="icon">⬡</div>
+          <div class="title">זיכרון</div>
+          <div class="desc">התאם זוגות</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ---------------- FLASHCARDS ----------------
+function startFlashcards(){
+  state.gameData.fc = { idx:0, flipped:false, order: shuffle(state.deck.words.map((_,i)=>i)) };
+  state.screen='flashcards'; render();
+}
+function renderFlashcards(){
+  const fc = state.gameData.fc;
+  const w = state.deck.words[fc.order[fc.idx]];
+  app.innerHTML = topbar(true, "goGames()") + `
+    <div class="progress-txt">כרטיסיה ${fc.idx+1} מתוך ${fc.order.length}</div>
+    <div class="flip-wrap">
+      <div class="flip-card ${fc.flipped?'flipped':''}" id="flipCard">
+        <div class="flip-face flip-front">
+          <div class="flip-word ltr">${w.word}</div>
+          <div class="flip-pos">${w.pos||''}</div>
+        </div>
+        <div class="flip-face flip-back">
+          <div class="flip-word">${w.translation}</div>
+          ${w.example? `<div class="flip-example ltr">${w.example}</div>`:''}
+        </div>
+      </div>
+    </div>
+    <div class="nav-row">
+      <button class="btn btn-ghost" ${fc.idx===0?'disabled':''} onclick="fcNav(-1)">→ קודם</button>
+      <button class="btn btn-primary" onclick="fcNav(1)">הבא ←</button>
+    </div>
+  `;
+  document.getElementById('flipCard').onclick = ()=>{ fc.flipped=!fc.flipped; render(); };
+}
+window.fcNav = function(dir){
+  const fc = state.gameData.fc;
+  fc.idx = Math.max(0, Math.min(fc.order.length-1, fc.idx+dir));
+  fc.flipped = false;
+  render();
+};
+
+// ---------------- QUIZ ----------------
+function startQuiz(){
+  const order = shuffle(state.deck.words.map((_,i)=>i));
+  state.gameData.quiz = { idx:0, order, score:0, answered:false, options:[] };
+  buildQuizOptions();
+  state.screen='quiz'; render();
+}
+function buildQuizOptions(){
+  const q = state.gameData.quiz;
+  const words = state.deck.words;
+  const correct = words[q.order[q.idx]];
+  let pool = words.filter(w=>w!==correct).map(w=>w.translation);
+  pool = shuffle(pool).slice(0,3);
+  while(pool.length<3){ pool.push('—'); }
+  const opts = shuffle([correct.translation, ...pool]);
+  q.options = opts;
+  q.answered = false;
+}
+function renderQuiz(){
+  const q = state.gameData.quiz;
+  const w = state.deck.words[q.order[q.idx]];
+  if(q.idx >= q.order.length){
+    app.innerHTML = topbar(true,"goGames()") + `
+      <div class="card result-box">
+        <div class="result-emoji serif">✓</div>
+        <h2>סיימת את החידון!</h2>
+        <div class="result-score">${q.score} / ${q.order.length}</div>
+        <div style="margin-top:20px; display:flex; flex-direction:column; gap:10px;">
+          <button class="btn btn-primary" onclick="startQuiz()">שחק שוב</button>
+          <button class="btn btn-ghost" onclick="goGames()">חזרה למשחקים</button>
+        </div>
+      </div>`;
+    return;
+  }
+  app.innerHTML = topbar(true, "goGames()") + `
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <span class="progress-txt" style="margin:0;">שאלה ${q.idx+1}/${q.order.length}</span>
+        <span class="score-pill">${q.score} ✓</span>
+      </div>
+      <p class="sub" style="margin:10px 0 0;">מה התרגום של המילה?</p>
+      <div class="quiz-word ltr">${w.word}</div>
+      <div id="opts">
+        ${q.options.map((opt,i)=>`<button class="opt-btn" data-i="${i}" onclick="answerQuiz(${i})">${opt}</button>`).join('')}
+      </div>
+    </div>
+  `;
+}
+window.answerQuiz = function(i){
+  const q = state.gameData.quiz;
+  if(q.answered) return;
+  q.answered = true;
+  const w = state.deck.words[q.order[q.idx]];
+  const correct = w.translation;
+  const btns = document.querySelectorAll('#opts .opt-btn');
+  btns.forEach(b=>{
+    if(b.textContent===correct) b.classList.add('correct');
+  });
+  if(q.options[i]===correct){ q.score++; }
+  else { btns[i].classList.add('wrong'); }
+  setTimeout(()=>{
+    q.idx++;
+    if(q.idx < q.order.length) buildQuizOptions();
+    render();
+  }, 900);
+};
+
+// ---------------- WORDLE ----------------
+function startWordle(){
+  const lengths = [...new Set(state.deck.words.map(w=>w.length))].filter(l=>l>=3 && l<=8).sort((a,b)=>a-b);
+  if(!lengths.length){
+    state.errorMsg = 'אין מילים באורך מתאים למשחק וורדל (3-8 אותיות)';
+    state.screen='error'; render(); return;
+  }
+  const candidates = state.deck.words.filter(w=>w.length===lengths[0]);
+  const target = candidates[Math.floor(Math.random()*candidates.length)];
+  state.gameData.wordle = {
+    target: target.word.toLowerCase(),
+    translation: target.translation,
+    len: lengths[0],
+    guesses: [],
+    current: '',
+    maxGuesses: 6,
+    status: 'playing',
+    keyStates: {}
+  };
+  state.screen='wordle'; render();
+}
+function evalGuess(guess, target){
+  const res = new Array(target.length).fill('b');
+  const tArr = target.split(''); const gArr = guess.split('');
+  const used = new Array(target.length).fill(false);
+  for(let i=0;i<gArr.length;i++){
+    if(gArr[i]===tArr[i]){ res[i]='g'; used[i]=true; }
+  }
+  for(let i=0;i<gArr.length;i++){
+    if(res[i]==='g') continue;
+    const idx = tArr.findIndex((c,j)=>c===gArr[i] && !used[j]);
+    if(idx>-1){ res[i]='y'; used[idx]=true; }
+  }
+  return res;
+}
+function renderWordle(){
+  const wl = state.gameData.wordle;
+  const rows = [];
+  for(let r=0;r<wl.maxGuesses;r++){
+    const guess = wl.guesses[r];
+    const isCurrent = r===wl.guesses.length && wl.status==='playing';
+    let cells = '';
+    for(let c=0;c<wl.len;c++){
+      let cls='', letter='';
+      if(guess){ letter = guess.word[c]; cls = guess.result[c]; }
+      else if(isCurrent && wl.current[c]){ letter = wl.current[c]; }
+      cells += `<div class="wl-cell ${cls}">${letter||''}</div>`;
+    }
+    rows.push(`<div class="wl-row" style="grid-template-columns:repeat(${wl.len},1fr);">${cells}</div>`);
+  }
+  const keyRows = [['q','w','e','r','t','y','u','i','o','p'],['a','s','d','f','g','h','j','k','l'],['ENTER','z','x','c','v','b','n','m','⌫']];
+  app.innerHTML = topbar(true, "goGames()") + `
+    <div class="card">
+      <p class="sub" style="margin-bottom:14px;">נחש מילה בת ${wl.len} אותיות. רמז: התרגום הוא "${wl.translation}"</p>
+      <div class="wl-grid">${rows.join('')}</div>
+      ${wl.status!=='playing' ? `
+        <div class="result-box" style="padding:10px 0 20px;">
+          <div class="result-emoji serif">${wl.status==='won'?'✓':'—'}</div>
+          <h2>${wl.status==='won' ? 'כל הכבוד!' : 'המילה הייתה: '+wl.target}</h2>
+          <button class="btn btn-primary" style="margin-top:12px;" onclick="startWordle()">מילה חדשה</button>
+        </div>
+      ` : `
+        <div class="kb">
+          ${keyRows.map(row=>`<div class="kb-row">
+            ${row.map(k=>`<button class="kb-key ${k.length===1?(wl.keyStates[k]||''):''} ${k.length>1?'wide':''}" onclick="wlKey('${k}')">${k==='ENTER'?'Enter':k}</button>`).join('')}
+          </div>`).join('')}
+        </div>
+      `}
+    </div>
+  `;
+}
+window.wlKey = function(k){
+  const wl = state.gameData.wordle;
+  if(wl.status!=='playing') return;
+  if(k==='ENTER'){
+    if(wl.current.length!==wl.len) return;
+    const result = evalGuess(wl.current, wl.target);
+    result.forEach((r,i)=>{
+      const ch = wl.current[i];
+      const rank = {b:0,y:1,g:2};
+      if(!wl.keyStates[ch] || rank[r]>rank[wl.keyStates[ch]]) wl.keyStates[ch]=r;
+    });
+    wl.guesses.push({word:wl.current, result});
+    if(wl.current===wl.target){ wl.status='won'; }
+    else if(wl.guesses.length>=wl.maxGuesses){ wl.status='lost'; }
+    wl.current='';
+  } else if(k==='⌫'){
+    wl.current = wl.current.slice(0,-1);
+  } else {
+    if(wl.current.length < wl.len) wl.current += k;
+  }
+  render();
+};
+document.addEventListener('keydown', (e)=>{
+  if(state.screen!=='wordle') return;
+  const wl = state.gameData.wordle;
+  if(!wl || wl.status!=='playing') return;
+  if(e.key==='Enter') wlKey('ENTER');
+  else if(e.key==='Backspace') wlKey('⌫');
+  else if(/^[a-zA-Z]$/.test(e.key)) wlKey(e.key.toLowerCase());
+});
+
+// ---------------- MEMORY ----------------
+function startMemory(){
+  const words = shuffle(state.deck.words).slice(0, Math.min(6, state.deck.words.length));
+  let cards = [];
+  words.forEach((w,i)=>{
+    cards.push({id:i, type:'word', text:w.word, pairId:i, cls:'ltr'});
+    cards.push({id:i+100, type:'trans', text:w.translation, pairId:i, cls:''});
+  });
+  cards = shuffle(cards);
+  state.gameData.memory = { cards, open:[], matched:[], moves:0, locked:false };
+  state.screen='memory'; render();
+}
+function renderMemory(){
+  const m = state.gameData.memory;
+  const allMatched = m.matched.length === m.cards.length;
+  app.innerHTML = topbar(true, "goGames()") + `
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; margin-bottom:14px;">
+        <span class="progress-txt" style="margin:0;">מהלכים: ${m.moves}</span>
+        <span class="score-pill">${m.matched.length/2} / ${m.cards.length/2} זוגות</span>
+      </div>
+      ${allMatched ? `
+        <div class="result-box">
+          <div class="result-emoji serif">✓</div>
+          <h2>מצוין! מצאת את כל הזוגות</h2>
+          <button class="btn btn-primary" style="margin-top:12px;" onclick="startMemory()">שחק שוב</button>
+        </div>
+      ` : `
+        <div class="mem-grid">
+          ${m.cards.map((c,i)=>{
+            const isOpen = m.open.includes(i) || m.matched.includes(i);
+            return `<div class="mem-card ${isOpen?'open':''} ${m.matched.includes(i)?'matched':''}" onclick="memFlip(${i})">
+              ${isOpen ? `<span class="${c.cls}">${c.text}</span>` : '?'}
+            </div>`;
+          }).join('')}
+        </div>
+      `}
+    </div>
+  `;
+}
+window.memFlip = function(i){
+  const m = state.gameData.memory;
+  if(m.locked || m.open.includes(i) || m.matched.includes(i) || m.open.length>=2) return;
+  m.open.push(i);
+  if(m.open.length===2){
+    m.moves++;
+    const [a,b] = m.open;
+    if(m.cards[a].pairId === m.cards[b].pairId){
+      m.matched.push(a,b);
+      m.open = [];
+      render();
+    } else {
+      m.locked = true;
+      render();
+      setTimeout(()=>{ m.open=[]; m.locked=false; render(); }, 850);
+    }
+    return;
+  }
+  render();
+};
+
+// ---------------- Utils ----------------
+function shuffle(arr){
+  const a = [...arr];
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+render();
+</script>
+</body>
+</html>
