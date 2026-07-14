@@ -8,6 +8,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&family=Frank+Ruhl+Libre:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  if(window['pdfjsLib']) pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+</script>
 <style>
 :root{
   --blue:#7B9BC2; --blue-light:#EAF0F8; --blue-dark:#4F6E96;
@@ -22,16 +27,18 @@
   --shadow-sm:0 1px 6px rgba(80,64,48,0.05);
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{height:100%; overflow:hidden; overscroll-behavior:none;}
 body{
-  margin:0; min-height:100vh;
+  margin:0;
   font-family:'Heebo',sans-serif; color:var(--text);
   background:var(--cream);
-  min-height:100dvh;
 }
 .serif{font-family:'Frank Ruhl Libre',serif;}
 .ltr{direction:ltr; font-family:'Poppins',sans-serif; unicode-bidi:isolate;}
-#app{max-width:520px; margin:0 auto; padding:20px 18px 44px; min-height:100dvh;}
-.topbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid var(--line);}
+#app{max-width:520px; margin:0 auto; padding:0 18px; height:100dvh; display:flex; flex-direction:column; overflow:hidden;}
+.topbar{display:flex; align-items:center; justify-content:space-between; padding:16px 0 14px; border-bottom:1px solid var(--line); flex-shrink:0;}
+.screen-body{flex:1; min-height:0; overflow-y:auto; padding:16px 0 18px; -webkit-overflow-scrolling:touch;}
+.list-scroll{max-height:32vh; overflow-y:auto; -webkit-overflow-scrolling:touch;}
 .logo{display:flex; align-items:center; gap:11px;}
 .logo-dot{width:36px; height:36px; border-radius:10px; background:var(--paper); border:1.5px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:16px;}
 .logo-text{font-family:'Frank Ruhl Libre',serif; font-weight:600; font-size:20px; letter-spacing:0.2px;}
@@ -136,27 +143,27 @@ p.sub{color:var(--text-soft); font-size:13.5px; line-height:1.7; margin:0 0 18px
 .score-pill{background:var(--blue-light); color:var(--blue-dark); border-radius:999px; padding:5px 14px; font-size:13px; font-weight:700;}
 
 /* Wordle */
-.wl-grid{display:grid; gap:6px; margin-bottom:16px;}
-.wl-row{display:grid; gap:6px;}
+.wl-grid{display:grid; gap:5px; margin-bottom:16px; max-width:340px; margin-left:auto; margin-right:auto;}
+.wl-row{display:grid; gap:5px;}
 .wl-cell{
-  aspect-ratio:1; border-radius:6px; border:1.5px solid var(--line); background:var(--paper);
-  display:flex; align-items:center; justify-content:center; font-weight:700; font-size:18px;
-  text-transform:uppercase; font-family:'Poppins',sans-serif;
+  aspect-ratio:1; border-radius:4px; border:2px solid var(--line); background:var(--paper);
+  display:flex; align-items:center; justify-content:center; font-weight:700; font-size:20px;
+  text-transform:uppercase; font-family:'Poppins',sans-serif; color:var(--text);
 }
 .wl-cell.g{background:var(--green); border-color:var(--green); color:#fff;}
 .wl-cell.y{background:var(--amber); border-color:var(--amber); color:#fff;}
-.wl-cell.b{background:#C7BEB4; border-color:#C7BEB4; color:#fff;}
-.kb{display:flex; flex-direction:column; gap:6px; margin-top:14px;}
+.wl-cell.b{background:#9E9285; border-color:#9E9285; color:#fff;}
+.kb{display:flex; flex-direction:column; gap:6px; margin-top:14px; max-width:380px; margin-left:auto; margin-right:auto;}
 .kb-row{display:flex; gap:5px; justify-content:center;}
 .kb-key{
-  flex:1; max-width:34px; height:42px; border-radius:7px; border:1px solid var(--line); background:var(--paper);
+  flex:1; max-width:34px; height:44px; border-radius:6px; border:none; background:var(--brown-light);
   font-family:'Poppins',sans-serif; font-weight:600; font-size:12px;
   text-transform:uppercase; cursor:pointer; color:var(--text);
 }
-.kb-key.wide{max-width:56px; font-size:11px;}
-.kb-key.g{background:var(--green); border-color:var(--green); color:#fff;}
-.kb-key.y{background:var(--amber); border-color:var(--amber); color:#fff;}
-.kb-key.b{background:#C7BEB4; border-color:#C7BEB4; color:#fff;}
+.kb-key.wide{max-width:52px; font-size:10.5px;}
+.kb-key.g{background:var(--green); color:#fff;}
+.kb-key.y{background:var(--amber); color:#fff;}
+.kb-key.b{background:#9E9285; color:#fff;}
 
 /* Memory */
 .mem-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
@@ -242,145 +249,196 @@ async function deleteDeck(id){
   }catch(e){}
 }
 
-// ---------------- Claude API ----------------
-async function callClaude(content){
-  const apiKey = getApiKey();
-  if(!apiKey){
-    throw new Error('לא הוגדר מפתח API. לחץ על ⚙️ בדף הבית והזן מפתח מ-console.anthropic.com');
-  }
-  let res;
-  try{
-    res = await fetch("https://api.anthropic.com/v1/messages",{
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true"
-      },
-      body: JSON.stringify({
-        model:"claude-sonnet-4-6",
-        max_tokens:1000,
-        messages:[{role:"user", content}]
-      })
-    });
-  }catch(networkErr){
-    throw new Error('בעיית תקשורת מול השרת (Failed to fetch). בדוק את החיבור לאינטרנט, ושהמפתח בהגדרות תקין.');
-  }
-  if(!res.ok){
-    let msg = 'שגיאת שרת (' + res.status + ')';
-    try{ const errData = await res.json(); if(errData?.error?.message) msg += ': ' + errData.error.message; }catch(e){}
-    if(res.status===401) msg = 'המפתח שהוזן לא תקין. עדכן אותו בהגדרות (⚙️).';
-    throw new Error(msg);
-  }
-  const data = await res.json();
-  const textBlock = (data.content||[]).find(b=>b.type==="text");
-  if(!textBlock) throw new Error("לא התקבלה תשובה תקינה מהשרת");
-  return textBlock.text;
-}
+// ---------------- Language options & stopwords ----------------
+const LANG_OPTIONS = [
+  {code:'por', mm:'pt', label:'פורטוגזית'},
+  {code:'eng', mm:'en', label:'אנגלית'},
+  {code:'spa', mm:'es', label:'ספרדית'},
+  {code:'fra', mm:'fr', label:'צרפתית'},
+  {code:'deu', mm:'de', label:'גרמנית'},
+  {code:'ita', mm:'it', label:'איטלקית'}
+];
+state.selectedLang = 'por';
 
-function parseVocabJson(raw){
-  let clean = raw.trim().replace(/^```json/,'').replace(/^```/,'').replace(/```$/,'').trim();
-  const parsed = JSON.parse(clean);
-  if(!parsed.words || !Array.isArray(parsed.words)) throw new Error("bad shape");
-  parsed.words = parsed.words.filter(w=>w.word && w.translation).map(w=>({
-    word: String(w.word).trim(),
-    translation: String(w.translation).trim(),
-    pos: w.pos || '',
-    example: w.example || '',
-    length: String(w.word).trim().length
-  }));
-  return parsed;
-}
+const STOPWORDS = {
+  pt: ['a','o','os','as','um','uma','uns','umas','de','do','da','dos','das','em','no','na','nos','nas','para','por','com','sem','que','se','e','ou','mas','como','mais','muito','ja','sao','foi','ser','estar','tem','ter','seu','sua','seus','suas','este','esta','isso','isto','aquele','aquela','eu','tu','ele','ela','nos','voces','eles','elas','me','te','lhe','nao','sim','ao','aos','pelo','pela','pelos','pelas','entre','sobre','ate','desde','quando','onde','porque','tambem','so','ainda','depois','antes'],
+  en: ['the','a','an','of','to','in','on','at','for','with','without','and','or','but','as','is','are','was','were','be','been','being','have','has','had','this','that','these','those','i','you','he','she','it','we','they','me','him','her','us','them','my','your','his','its','our','their','not','no','yes','so','if','then','than','because','also','still','after','before','from','by','about','into','over','under'],
+  es: ['el','la','los','las','un','una','unos','unas','de','del','en','y','o','pero','que','se','es','son','fue','ser','estar','tiene','tener','su','sus','este','esta','eso','esto','yo','tu','el','ella','nosotros','ellos','ellas','me','te','le','no','si','al','por','para','con','sin','entre','sobre','hasta','desde','cuando','donde','porque','tambien','solo','aun','despues','antes'],
+  fr: ['le','la','les','un','une','des','de','du','en','et','ou','mais','que','qui','se','est','sont','etre','avoir','ce','cette','ces','je','tu','il','elle','nous','vous','ils','elles','me','te','lui','ne','pas','oui','non','au','aux','par','pour','avec','sans','entre','sur','jusque','depuis','quand','ou','parce','aussi','encore','apres','avant'],
+  de: ['der','die','das','ein','eine','einen','einem','einer','und','oder','aber','dass','sich','ist','sind','war','waren','sein','haben','hat','hatte','dieser','diese','dieses','ich','du','er','sie','es','wir','ihr','mich','dich','ihn','nicht','ja','nein','am','im','zum','zur','fur','mit','ohne','zwischen','uber','bis','seit','wann','wo','weil','auch','noch','nach','vor'],
+  it: ['il','lo','la','i','gli','le','un','uno','una','di','del','della','in','e','o','ma','che','si','e','sono','stato','essere','avere','ha','questo','questa','io','tu','lui','lei','noi','voi','loro','mi','ti','lo','non','si','no','al','per','con','senza','tra','fra','sopra','fino','da','quando','dove','perche','anche','ancora','dopo','prima']
+};
 
-const VOCAB_PROMPT = `אתה עוזר ללימוד שפות. תקבל טקסט או מסמך במקור. בצע:
-1. זהה את השפה של הטקסט.
-2. חלץ עד 18 מילים או ביטויים קצרים שהם המילים המרכזיות/השימושיות ביותר בטקסט (הימנע ממילות קישור טריוויאליות).
-3. עבור כל מילה תן: את המילה במקור, תרגום קצר לעברית, חלק דיבר (pos, בעברית קצר כמו "שם עצם"/"פועל"/"שם תואר"), ומשפט דוגמה קצר מתוך הטקסט או שנוצר על ידך המכיל את המילה.
-החזר אך ורק JSON תקני בפורמט הבא, בלי שום טקסט נוסף, בלי מרקדאון:
-{"detectedLanguage":"שם השפה בעברית","words":[{"word":"...","translation":"...","pos":"...","example":"..."}]}`;
+function escapeRegex(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '$&'); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
-async function extractFromText(text){
-  const raw = await callClaude(VOCAB_PROMPT + "\n\nהטקסט:\n" + text.slice(0,6000));
-  return parseVocabJson(raw);
-}
-async function extractFromImage(base64, mediaType){
-  const raw = await callClaude([
-    {type:"image", source:{type:"base64", media_type:mediaType, data:base64}},
-    {type:"text", text: VOCAB_PROMPT}
-  ]);
-  return parseVocabJson(raw);
-}
-async function extractFromPdf(base64){
-  const raw = await callClaude([
-    {type:"document", source:{type:"base64", media_type:"application/pdf", data:base64}},
-    {type:"text", text: VOCAB_PROMPT}
-  ]);
-  return parseVocabJson(raw);
-}
-
-function fileToBase64(file){
-  return new Promise((res,rej)=>{
-    const r = new FileReader();
-    r.onload = ()=> res(r.result.split(',')[1]);
-    r.onerror = ()=> rej(new Error("read failed"));
-    r.readAsDataURL(file);
+function extractVocabFromText(text, langOpt){
+  const sentences = text.split(/(?<=[.!?])\s+/).filter(s=>s.trim().length>2);
+  const tokens = (text.toLowerCase().match(/[\p{L}'-]+/gu)) || [];
+  const stop = STOPWORDS[langOpt.mm] || [];
+  const freq = {};
+  tokens.forEach(w=>{
+    if(w.length<3 || w.length>18) return;
+    if(stop.includes(w)) return;
+    if(/^\d+$/.test(w)) return;
+    if(/(.)\1{3,}/.test(w)) return; // ocr noise like "aaaa"
+    if(!/[aeiouàáâãäèéêëìíîïòóôõöùúûü]/i.test(w)) return; // no vowel at all = likely garbage
+    freq[w] = (freq[w]||0)+1;
+  });
+  let candidates = Object.keys(freq).sort((a,b)=> freq[b]-freq[a]).slice(0,30);
+  return candidates.map(w=>{
+    const example = sentences.find(s=> s.toLowerCase().includes(w)) || '';
+    const m = text.match(new RegExp('\\b'+escapeRegex(w)+'\\b','i'));
+    const original = m ? m[0] : w;
+    return { word: original, translation:'', pos:'', example: example.trim().slice(0,140), length: original.length };
   });
 }
 
-// Resize/compress images so large phone photos don't blow up the request
-function compressImage(file, maxDim=1500, quality=0.85){
-  return new Promise((resolve, reject)=>{
+function hasHebrew(s){ return /[\u0590-\u05FF]/.test(s); }
+
+async function mmTranslate(text, srcCode, tgtCode){
+  const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${srcCode}|${tgtCode}`);
+  const data = await res.json();
+  const t = data && data.responseData && data.responseData.translatedText;
+  return (t || '').trim();
+}
+
+async function translateWords(words, srcCode, tgtCode, onProgress){
+  const out = [];
+  for(let i=0;i<words.length;i++){
+    const w = words[i];
+    if(onProgress) onProgress(`מתרגם מילים... (${i+1}/${words.length})`);
+    try{
+      let t = await mmTranslate(w.word, srcCode, tgtCode);
+      // MyMemory sometimes has no direct pair data and echoes back a non-Hebrew guess.
+      // Fall back to a two-step translation through English, which has far richer coverage.
+      if((!t || !hasHebrew(t) || t.toLowerCase()===w.word.toLowerCase()) && srcCode!=='en'){
+        await sleep(150);
+        const viaEn = await mmTranslate(w.word, srcCode, 'en');
+        if(viaEn && viaEn.toLowerCase()!==w.word.toLowerCase()){
+          await sleep(150);
+          const heFromEn = await mmTranslate(viaEn, 'en', tgtCode);
+          if(heFromEn && hasHebrew(heFromEn)) t = heFromEn;
+        }
+      }
+      if(t && hasHebrew(t)){
+        w.translation = t;
+        out.push(w);
+      }
+    }catch(e){ /* skip word on failure */ }
+    await sleep(150);
+  }
+  return out;
+}
+
+// ---------------- OCR / text extraction (free, local) ----------------
+function preprocessImageForOcr(file){
+  return new Promise((resolve,reject)=>{
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = ()=>{
-      let {width, height} = img;
-      if(width > maxDim || height > maxDim){
-        if(width > height){ height = Math.round(height * maxDim/width); width = maxDim; }
-        else { width = Math.round(width * maxDim/height); height = maxDim; }
+      const maxDim = 2000;
+      let {width,height} = img;
+      if(width>maxDim || height>maxDim){
+        if(width>height){ height=Math.round(height*maxDim/width); width=maxDim; }
+        else{ width=Math.round(width*maxDim/height); height=maxDim; }
       }
       const canvas = document.createElement('canvas');
-      canvas.width = width; canvas.height = height;
+      canvas.width=width; canvas.height=height;
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, width, height);
+      ctx.drawImage(img,0,0,width,height);
+      const imgData = ctx.getImageData(0,0,width,height);
+      const d = imgData.data;
+      for(let i=0;i<d.length;i+=4){
+        const gray = 0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+        const contrast = Math.min(255, Math.max(0, (gray-128)*1.35+128));
+        d[i]=d[i+1]=d[i+2]=contrast;
+      }
+      ctx.putImageData(imgData,0,0);
       URL.revokeObjectURL(url);
-      const dataUrl = canvas.toDataURL('image/jpeg', quality);
-      resolve(dataUrl.split(',')[1]);
+      resolve(canvas);
     };
     img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error('לא ניתן לקרוא את התמונה')); };
     img.src = url;
   });
 }
 
-async function processFile(file){
+async function extractTextFromImage(file, langCode, onProgress){
+  if(onProgress) onProgress('מכין את התמונה...');
+  const canvas = await preprocessImageForOcr(file);
+  if(onProgress) onProgress('מזהה טקסט בתמונה...');
+  const { data } = await Tesseract.recognize(canvas, langCode, {
+    logger: m=>{ if(onProgress && m.status==='recognizing text') onProgress('מזהה טקסט... ' + Math.round((m.progress||0)*100) + '%'); }
+  });
+  return data.text || '';
+}
+
+async function extractTextFromPdf(file, langCode, onProgress){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  let fullText = '';
+  const textPages = Math.min(pdf.numPages, 8);
+  for(let i=1;i<=textPages;i++){
+    if(onProgress) onProgress(`קורא עמוד ${i} מתוך ${textPages}...`);
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    fullText += content.items.map(it=>it.str).join(' ') + '\n';
+  }
+  if(fullText.trim().length < 40){
+    fullText = '';
+    const ocrPages = Math.min(pdf.numPages, 3);
+    for(let i=1;i<=ocrPages;i++){
+      if(onProgress) onProgress(`מזהה טקסט בעמוד ${i} (סריקה)...`);
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({scale:2});
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width; canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+      await page.render({canvasContext: ctx, viewport}).promise;
+      const { data } = await Tesseract.recognize(canvas, langCode);
+      fullText += (data.text||'') + '\n';
+    }
+  }
+  return fullText;
+}
+
+async function processFile(file, onProgress){
+  const langOpt = LANG_OPTIONS.find(l=>l.code===state.selectedLang) || LANG_OPTIONS[0];
   const ext = file.name.split('.').pop().toLowerCase();
   if(file.size > 25*1024*1024){
     throw new Error('הקובץ גדול מדי (מעל 25MB). נסה קובץ קטן יותר.');
   }
+  let rawText = '';
   if(['png','jpg','jpeg','webp','gif'].includes(ext)){
-    const b64 = await compressImage(file);
-    return await extractFromImage(b64, 'image/jpeg');
-  }
-  if(ext==='pdf'){
-    const b64 = await fileToBase64(file);
-    return await extractFromPdf(b64);
-  }
-  if(ext==='docx'){
+    rawText = await extractTextFromImage(file, langOpt.code, onProgress);
+  } else if(ext==='pdf'){
+    rawText = await extractTextFromPdf(file, langOpt.code, onProgress);
+  } else if(ext==='docx'){
+    if(onProgress) onProgress('קורא את קובץ ה-Word...');
     const buf = await file.arrayBuffer();
     const result = await mammoth.extractRawText({arrayBuffer: buf});
-    return await extractFromText(result.value);
-  }
-  if(['xlsx','xls','csv'].includes(ext)){
+    rawText = result.value;
+  } else if(['xlsx','xls','csv'].includes(ext)){
+    if(onProgress) onProgress('קורא את קובץ האקסל...');
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, {type:'array'});
-    let text = '';
-    wb.SheetNames.forEach(name=>{
-      const sheet = wb.Sheets[name];
-      text += XLSX.utils.sheet_to_csv(sheet) + '\n';
-    });
-    return await extractFromText(text);
+    rawText = wb.SheetNames.map(n=>XLSX.utils.sheet_to_csv(wb.Sheets[n])).join('\n');
+  } else {
+    throw new Error('סוג קובץ לא נתמך');
   }
-  throw new Error('סוג קובץ לא נתמך');
+  if(!rawText || rawText.trim().length < 20){
+    throw new Error('לא הצלחנו לזהות מספיק טקסט בקובץ. נסה תמונה ברורה וחדה יותר, או ודא שבחרת את השפה הנכונה.');
+  }
+  if(onProgress) onProgress('בוחר את המילים החשובות...');
+  let words = extractVocabFromText(rawText, langOpt);
+  if(words.length < 4){
+    throw new Error('נמצאו מעט מדי מילים מתאימות בטקסט. נסה קובץ עם יותר תוכן.');
+  }
+  words = await translateWords(words, langOpt.mm, 'he', onProgress);
+  if(words.length < 4){
+    throw new Error('לא הצלחנו לתרגם מספיק מילים כרגע. נסה שוב בעוד רגע.');
+  }
+  return { detectedLanguage: langOpt.label, words };
 }
 
 // ---------------- Rendering Router ----------------
@@ -403,56 +461,30 @@ function topbar(showBack, backFn){
       <div><div class="logo-text">LinguaScan</div><div class="logo-sub">למידת שפות ממסמכים</div></div>
     </div>
     <div style="display:flex; gap:8px;">
-      ${!showBack ? `<button class="icon-btn" onclick="openSettings()">⚙</button>` : ''}
       ${showBack ? `<button class="icon-btn" onclick="${backFn}">✕</button>` : ''}
     </div>
   </div>`;
 }
 
-let inMemoryApiKey = '';
-function getApiKey(){
-  if(inMemoryApiKey) return inMemoryApiKey;
-  try{ return localStorage.getItem('linguaScanApiKey') || ''; }catch(e){ return ''; }
-}
-function setApiKey(k){
-  inMemoryApiKey = k;
-  try{ localStorage.setItem('linguaScanApiKey', k); }catch(e){}
-}
-window.openSettings = function(){
-  const current = getApiKey();
-  app.innerHTML = topbar(true, "goHome()") + `
-    <div class="card">
-      <h1>הגדרות</h1>
-      <p class="sub">כדי שהאפליקציה תעבוד באופן עצמאי (מחוץ לצ'אט של קלוד), צריך מפתח API אישי מ-<span class="ltr">console.anthropic.com</span>. המפתח נשמר רק בדפדפן שלך, בקובץ הזה בלבד.</p>
-      <input type="password" id="apiKeyInput" placeholder="sk-ant-..." class="ltr" style="width:100%; padding:14px; border-radius:14px; border:2px solid #eee; font-size:14px; margin-bottom:12px;" value="${current}">
-      <button class="btn btn-primary" onclick="saveApiKey()">שמור מפתח</button>
-    </div>
-  `;
-};
-window.saveApiKey = function(){
-  const val = document.getElementById('apiKeyInput').value.trim();
-  if(!val){ return; }
-  setApiKey(val);
-  const btn = event.target;
-  btn.textContent = '✓ נשמר! חוזר...';
-  setTimeout(goHome, 700);
-};
-
 // ---------------- HOME ----------------
 async function renderHome(){
-  app.innerHTML = topbar(false) + `
+  app.innerHTML = topbar(false) + `<div class="screen-body">
     <div class="card">
       <h1>העלה מסמך ותתחיל ללמוד</h1>
-      <p class="sub">תמונה, PDF, Word או Excel — נחלץ מהם את אוצר המילים ונבנה עבורך משחקים ללימוד השפה.</p>
+      <p class="sub">תמונה, PDF, Word או Excel — נחלץ מהם את אוצר המילים ונבנה עבורך משחקים ללימוד השפה. הכל חינמי ופועל בדפדפן שלך.</p>
       <div class="steps">
-        <div class="step"><div class="step-num">1</div><div class="step-txt">העלה או צלם <b>מסמך</b> בשפה שאתה לומד</div></div>
+        <div class="step"><div class="step-num">1</div><div class="step-txt">בחר <b>שפה</b> והעלה או צלם מסמך</div></div>
         <div class="step"><div class="step-num">2</div><div class="step-txt">אנחנו <b>מזהים ומתרגמים</b> את המילים החשובות בו</div></div>
         <div class="step"><div class="step-num">3</div><div class="step-txt">אתה <b>מתרגל</b> אותן בארבעה משחקים שונים</div></div>
       </div>
+      <p class="sub" style="margin-bottom:8px; font-weight:600; color:var(--text);">שפת המסמך</p>
+      <select id="langSelect" class="ltr" style="width:100%; padding:13px; border-radius:12px; border:1.5px solid var(--line); font-size:14px; margin-bottom:16px; font-family:'Heebo',sans-serif; direction:rtl; background:var(--paper); color:var(--text);">
+        ${LANG_OPTIONS.map(l=>`<option value="${l.code}" ${l.code===state.selectedLang?'selected':''}>${l.label}</option>`).join('')}
+      </select>
       <div class="dropzone" id="dz">
         <div class="icn">◇</div>
         <div class="txt">גרור קובץ לכאן או לחץ לבחירה</div>
-        <div class="txt2">העיבוד מתבצע באמצעות בינה מלאכותית</div>
+        <div class="txt2">זיהוי טקסט ותרגום חינמיים, ללא הרשמה</div>
       </div>
       <div style="display:flex; gap:10px; margin-bottom:6px;">
         <button class="btn btn-brown" id="cameraBtn">צלם עכשיו</button>
@@ -467,7 +499,8 @@ async function renderHome(){
       </div>
     </div>
     <div id="savedSection"></div>
-  `;
+  </div>`;
+  document.getElementById('langSelect').onchange = (e)=>{ state.selectedLang = e.target.value; };
   document.getElementById('dz').onclick = ()=> document.getElementById('fileInput').click();
   document.getElementById('fileInput').onchange = (e)=>{
     if(e.target.files[0]) startProcessing(e.target.files[0]);
@@ -489,6 +522,7 @@ async function renderHome(){
   if(state.savedDecks.length){
     sec.innerHTML = `<div class="card">
       <h2>חפיסות שמורות</h2>
+      <div class="list-scroll">
       ${state.savedDecks.map(d=>`
         <div class="deck-item" onclick="openDeck('${d.id}')">
           <div>
@@ -501,6 +535,7 @@ async function renderHome(){
           </div>
         </div>
       `).join('')}
+      </div>
     </div>`;
   } else {
     sec.innerHTML = '';
@@ -523,12 +558,15 @@ window.removeDeck = async function(id){
 async function startProcessing(file){
   state.uploadedFile = file;
   state.screen = 'processing';
+  state.processingStatus = 'מתחילים...';
   render();
+  const onProgress = (msg)=>{
+    state.processingStatus = msg;
+    const el = document.getElementById('procStatus');
+    if(el) el.textContent = msg;
+  };
   try{
-    const result = await processFile(file);
-    if(!result.words || result.words.length < 4){
-      throw new Error('נמצאו מעט מדי מילים במסמך. נסה קובץ עם יותר טקסט.');
-    }
+    const result = await processFile(file, onProgress);
     const deck = {
       id: 'd'+Date.now(),
       title: file.name.replace(/\.[^.]+$/,''),
@@ -548,31 +586,32 @@ async function startProcessing(file){
 }
 
 function renderProcessing(){
-  app.innerHTML = topbar(false) + `
+  app.innerHTML = topbar(false) + `<div class="screen-body">
     <div class="card" style="text-align:center; padding:50px 20px;">
       <div class="spinner"></div>
       <h2>מעבד את המסמך...</h2>
-      <p class="sub">מחלץ אוצר מילים ומתרגם</p>
+      <p class="sub" id="procStatus">${state.processingStatus || 'מתחילים...'}</p>
     </div>
-  `;
+  </div>`;
 }
 function renderError(){
-  app.innerHTML = topbar(true, "goHome()") + `
+  app.innerHTML = topbar(true, "goHome()") + `<div class="screen-body">
     <div class="card">
       <div class="err-box">${state.errorMsg}</div>
       <button class="btn btn-primary" onclick="goHome()">חזרה לדף הבית</button>
     </div>
-  `;
+  </div>`;
 }
 window.goHome = function(){ state.screen='home'; render(); };
 
 // ---------------- DECK REVIEW ----------------
 function renderDeckReview(){
   const d = state.deck;
-  app.innerHTML = topbar(true, "goHome()") + `
+  app.innerHTML = topbar(true, "goHome()") + `<div class="screen-body">
     <div class="card">
       <h1>${d.title}</h1>
       <p class="sub">שפה: ${d.detectedLanguage || 'לא זוהתה'} · ${d.words.length} מילים נמצאו</p>
+      <div class="list-scroll">
       ${d.words.map(w=>`
         <div class="word-row">
           <div>
@@ -582,15 +621,16 @@ function renderDeckReview(){
           <span class="chip-len">${w.length} אותיות</span>
         </div>
       `).join('')}
+      </div>
     </div>
     <button class="btn btn-primary" onclick="goGames()">בוא נתחיל ללמוד</button>
-  `;
+  </div>`;
 }
 window.goGames = function(){ state.screen='games'; render(); };
 
 // ---------------- GAMES HUB ----------------
 function renderGamesHub(){
-  app.innerHTML = topbar(true, "goHome()") + `
+  app.innerHTML = topbar(true, "goHome()") + `<div class="screen-body">
     <div class="card">
       <h2>${state.deck.title}</h2>
       <p class="sub">בחר משחק לתרגול</p>
@@ -617,7 +657,7 @@ function renderGamesHub(){
         </div>
       </div>
     </div>
-  `;
+  </div>`;
 }
 
 // ---------------- FLASHCARDS ----------------
@@ -628,7 +668,7 @@ function startFlashcards(){
 function renderFlashcards(){
   const fc = state.gameData.fc;
   const w = state.deck.words[fc.order[fc.idx]];
-  app.innerHTML = topbar(true, "goGames()") + `
+  app.innerHTML = topbar(true, "goGames()") + `<div class="screen-body">
     <div class="progress-txt">כרטיסיה ${fc.idx+1} מתוך ${fc.order.length}</div>
     <div class="flip-wrap">
       <div class="flip-card ${fc.flipped?'flipped':''}" id="flipCard">
@@ -646,7 +686,7 @@ function renderFlashcards(){
       <button class="btn btn-ghost" ${fc.idx===0?'disabled':''} onclick="fcNav(-1)">→ קודם</button>
       <button class="btn btn-primary" onclick="fcNav(1)">הבא ←</button>
     </div>
-  `;
+  </div>`;
   document.getElementById('flipCard').onclick = ()=>{ fc.flipped=!fc.flipped; render(); };
 }
 window.fcNav = function(dir){
@@ -678,7 +718,7 @@ function renderQuiz(){
   const q = state.gameData.quiz;
   const w = state.deck.words[q.order[q.idx]];
   if(q.idx >= q.order.length){
-    app.innerHTML = topbar(true,"goGames()") + `
+    app.innerHTML = topbar(true,"goGames()") + `<div class="screen-body">
       <div class="card result-box">
         <div class="result-emoji serif">✓</div>
         <h2>סיימת את החידון!</h2>
@@ -687,10 +727,11 @@ function renderQuiz(){
           <button class="btn btn-primary" onclick="startQuiz()">שחק שוב</button>
           <button class="btn btn-ghost" onclick="goGames()">חזרה למשחקים</button>
         </div>
-      </div>`;
+      </div>
+    </div>`;
     return;
   }
-  app.innerHTML = topbar(true, "goGames()") + `
+  app.innerHTML = topbar(true, "goGames()") + `<div class="screen-body">
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
         <span class="progress-txt" style="margin:0;">שאלה ${q.idx+1}/${q.order.length}</span>
@@ -702,7 +743,7 @@ function renderQuiz(){
         ${q.options.map((opt,i)=>`<button class="opt-btn" data-i="${i}" onclick="answerQuiz(${i})">${opt}</button>`).join('')}
       </div>
     </div>
-  `;
+  </div>`;
 }
 window.answerQuiz = function(i){
   const q = state.gameData.quiz;
@@ -725,17 +766,20 @@ window.answerQuiz = function(i){
 
 // ---------------- WORDLE ----------------
 function startWordle(){
-  const lengths = [...new Set(state.deck.words.map(w=>w.length))].filter(l=>l>=3 && l<=8).sort((a,b)=>a-b);
-  if(!lengths.length){
-    state.errorMsg = 'אין מילים באורך מתאים למשחק וורדל (3-8 אותיות)';
+  const allLengths = [...new Set(state.deck.words.map(w=>w.length))];
+  const preferred = allLengths.filter(l=>l>=4 && l<=7);
+  const pool = preferred.length ? preferred : allLengths.filter(l=>l>=3 && l<=9);
+  if(!pool.length){
+    state.errorMsg = 'אין מילים באורך מתאים למשחק וורדל';
     state.screen='error'; render(); return;
   }
-  const candidates = state.deck.words.filter(w=>w.length===lengths[0]);
+  const chosenLen = pool[Math.floor(Math.random()*pool.length)];
+  const candidates = state.deck.words.filter(w=>w.length===chosenLen);
   const target = candidates[Math.floor(Math.random()*candidates.length)];
   state.gameData.wordle = {
     target: target.word.toLowerCase(),
     translation: target.translation,
-    len: lengths[0],
+    len: chosenLen,
     guesses: [],
     current: '',
     maxGuesses: 6,
@@ -771,13 +815,13 @@ function renderWordle(){
       else if(isCurrent && wl.current[c]){ letter = wl.current[c]; }
       cells += `<div class="wl-cell ${cls}">${letter||''}</div>`;
     }
-    rows.push(`<div class="wl-row" style="grid-template-columns:repeat(${wl.len},1fr);">${cells}</div>`);
+    rows.push(`<div class="wl-row" dir="ltr" style="grid-template-columns:repeat(${wl.len},1fr);">${cells}</div>`);
   }
   const keyRows = [['q','w','e','r','t','y','u','i','o','p'],['a','s','d','f','g','h','j','k','l'],['ENTER','z','x','c','v','b','n','m','⌫']];
-  app.innerHTML = topbar(true, "goGames()") + `
+  app.innerHTML = topbar(true, "goGames()") + `<div class="screen-body">
     <div class="card">
       <p class="sub" style="margin-bottom:14px;">נחש מילה בת ${wl.len} אותיות. רמז: התרגום הוא "${wl.translation}"</p>
-      <div class="wl-grid">${rows.join('')}</div>
+      <div class="wl-grid" dir="ltr">${rows.join('')}</div>
       ${wl.status!=='playing' ? `
         <div class="result-box" style="padding:10px 0 20px;">
           <div class="result-emoji serif">${wl.status==='won'?'✓':'—'}</div>
@@ -785,14 +829,14 @@ function renderWordle(){
           <button class="btn btn-primary" style="margin-top:12px;" onclick="startWordle()">מילה חדשה</button>
         </div>
       ` : `
-        <div class="kb">
+        <div class="kb" dir="ltr">
           ${keyRows.map(row=>`<div class="kb-row">
             ${row.map(k=>`<button class="kb-key ${k.length===1?(wl.keyStates[k]||''):''} ${k.length>1?'wide':''}" onclick="wlKey('${k}')">${k==='ENTER'?'Enter':k}</button>`).join('')}
           </div>`).join('')}
         </div>
       `}
     </div>
-  `;
+  </div>`;
 }
 window.wlKey = function(k){
   const wl = state.gameData.wordle;
@@ -840,7 +884,7 @@ function startMemory(){
 function renderMemory(){
   const m = state.gameData.memory;
   const allMatched = m.matched.length === m.cards.length;
-  app.innerHTML = topbar(true, "goGames()") + `
+  app.innerHTML = topbar(true, "goGames()") + `<div class="screen-body">
     <div class="card">
       <div style="display:flex; justify-content:space-between; margin-bottom:14px;">
         <span class="progress-txt" style="margin:0;">מהלכים: ${m.moves}</span>
@@ -863,7 +907,7 @@ function renderMemory(){
         </div>
       `}
     </div>
-  `;
+  </div>`;
 }
 window.memFlip = function(i){
   const m = state.gameData.memory;
